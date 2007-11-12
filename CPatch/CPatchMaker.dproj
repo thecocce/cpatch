@@ -1,4 +1,5 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ProjectGuid>{7dfea5c1-9bcb-406b-8403-0b87c3ffd40e}</ProjectGuid>
     <MainSource>CPatchMaker.dpr</MainSource>

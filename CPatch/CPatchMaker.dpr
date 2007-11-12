@@ -9,7 +9,9 @@ program CPatchMaker;
 
 {$R 'resource.res' 'resource.rc'}
 uses
-  Maker in 'Maker.pas';
+  Maker in 'Maker.pas',
+  ComCtl32 in 'ComCtl32.pas',
+  CommDlg in 'CommDlg.pas';
 
 begin
   Maker_Main;
