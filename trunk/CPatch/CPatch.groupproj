@@ -1,0 +1,34 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{04fb4b49-41d8-4746-8ee3-a6b6cb466ef7}</ProjectGuid>
+  </PropertyGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <Projects Include="CPatchMaker.bdsproj" />
+  </ItemGroup>
+  <ProjectExtensions>
+    <Borland.Personality>Default.Personality</Borland.Personality>
+    <Borland.ProjectType />
+    <BorlandProject>
+  <BorlandProject xmlns=""> <Default.Personality> </Default.Personality> </BorlandProject></BorlandProject>
+  </ProjectExtensions>
+  <Target Name="CPatchMaker">
+    <MSBuild Projects="CPatchMaker.bdsproj" Targets="" />
+  </Target>
+  <Target Name="CPatchMaker:Clean">
+    <MSBuild Projects="CPatchMaker.bdsproj" Targets="Clean" />
+  </Target>
+  <Target Name="CPatchMaker:Make">
+    <MSBuild Projects="CPatchMaker.bdsproj" Targets="Make" />
+  </Target>
+  <Target Name="Build">
+    <CallTarget Targets="CPatchMaker" />
+  </Target>
+  <Target Name="Clean">
+    <CallTarget Targets="CPatchMaker:Clean" />
+  </Target>
+  <Target Name="Make">
+    <CallTarget Targets="CPatchMaker:Make" />
+  </Target>
+  <Import Condition="Exists('$(MSBuildBinPath)\Borland.Group.Targets')" Project="$(MSBuildBinPath)\Borland.Group.Targets" />
+</Project>
