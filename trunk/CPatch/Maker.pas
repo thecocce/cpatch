@@ -15,6 +15,7 @@ implementation
 uses
   Windows,
   Messages,
+  ShellAPI,
   FastMM4,
   CommDlg,
   ComCtl32;
@@ -28,6 +29,9 @@ const
   IDC_GOBTN = 106;
   IDC_PROGRESS = 107;
 
+  MAIN_WIDTH = 500;
+  MAIN_HEIGHT = 450;
+
 var
   MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, GoBtnWnd, ProgWnd: HWND;
 
@@ -35,6 +39,8 @@ function WndProc(hWnd: HWND; message: UINT; wParam: WPARAM; lParam: LPARAM): LRE
 var
   ofn: OPENFILENAMEW;
   szFile: packed array [0..259] of WCHAR;
+  point: TPoint;
+  FWnd: Cardinal;
 begin
 	case message of
 	WM_COMMAND:
@@ -75,7 +81,7 @@ begin
 					end;
           }
             end;
-          IDC_SRCBTN:
+          IDC_SRCBTN, IDC_DSTBTN:
             begin
     					ZeroMemory(@ofn, sizeof(ofn));
     					ofn.lStructSize := sizeof(ofn);
@@ -92,23 +98,46 @@ begin
 
               if GetOpenFileNameW(ofn) then
               begin
-                SetWindowTextW(SrcFileWnd, ofn.lpstrFile);
-                EnableWindow(GoBtnWnd, TRUE);
+                if LOWORD(wParam) = IDC_SRCBTN then
+                  SetWindowTextW(SrcFileWnd, ofn.lpstrFile)
+                else
+                  SetWindowTextW(DstFileWnd, ofn.lpstrFile);
+                if (GetWindowTextLengthW(SrcFileWnd) > 0) and (GetWindowTextLengthW(DstFileWnd) > 0) then
+                  EnableWindow(GoBtnWnd, TRUE);
               end;
             end;
           end;
         end;
       end;
     end;
-	WM_DESTROY:
+  WM_DROPFILES:
     begin
-  		PostQuitMessage(0);
+      if DragQueryFileW(wParam, $FFFFFFFF, nil, 0) > 0 then
+      begin
+        DragQueryFileW(wParam, 0, szFile, 260);
+        DragQueryPoint(wParam, point);
+        FWnd := ChildWindowFromPoint(MainWnd, point);
+        if FWnd = SrcFileWnd then
+          SetWindowTextW(SrcFileWnd, szFile)
+        else if FWnd = DstFileWnd then
+          SetWindowTextW(DstFileWnd, szFile)
+        else
+        begin
+          if GetWindowTextLengthW(SrcFileWnd) <= 0 then
+            SetWindowTextW(SrcFileWnd, szFile)
+          else
+            SetWindowTextW(DstFileWnd, szFile);
+        end;
+        DragFinish(wParam);
+      end;
     end;
+	WM_DESTROY:
+  	PostQuitMessage(0);
   else
-  begin
-		result := DefWindowProcW(hWnd, message, wParam, lParam);
-    exit;
-  end;
+    begin
+		  result := DefWindowProcW(hWnd, message, wParam, lParam);
+      exit;
+    end;
 	end;
 	result := 0;
 end;
@@ -170,10 +199,11 @@ begin
 	MyRegisterClass(hInstance);
  	cx := GetSystemMetrics(SM_CXSCREEN);
 	cy := GetSystemMetrics(SM_CYSCREEN);
-	MainWnd := UserWin(0, 'CPatchMaker', 'CPatchMaker', WS_OVERLAPPED or WS_CAPTION
-    or WS_SYSMENU, (cx - 360) div 2, (cy - 350) div 2, 360, 350, 0, 0,
+	MainWnd := UserWin(WS_EX_ACCEPTFILES, 'CPatchMaker', 'CPatch Maker', WS_OVERLAPPED or WS_CAPTION
+    or WS_SYSMENU, (cx - MAIN_WIDTH) div 2, (cy - MAIN_HEIGHT) div 2, MAIN_WIDTH, MAIN_HEIGHT, 0, 0,
     hInstance, nil);
   GetClientRect(MainWnd, rect);
+
   UserWin(0, 'STATIC',
 {$IFDEF LANG_CHS}
   '原始文件:'
@@ -181,12 +211,13 @@ begin
   'Original:'
 {$ENDIF}
   , WS_VISIBLE or WS_CHILD, rect.Left + 8, 11, 60, 16, MainWnd, IDC_SRCFILE, hInstance, nil);
-  SrcFileWnd := UserWin(WS_EX_CLIENTEDGE, 'EDIT', nil, WS_VISIBLE or WS_CHILD,
+  SrcFileWnd := UserWin(WS_EX_CLIENTEDGE, 'EDIT', nil, WS_VISIBLE or WS_CHILD or ES_READONLY or ES_AUTOHSCROLL,
     rect.Left + 70, 8, rect.Right - rect.Left - 140, 20, MainWnd, IDC_SRCFILE,
     hInstance, nil);
   SrcFileBtn := UserWin(0, 'BUTTON', '...', WS_VISIBLE or WS_CHILD or
     BS_PUSHBUTTON, rect.Right - rect.Left - 68, 8, 60, 20, MainWnd, IDC_SRCBTN,
     hInstance, nil);
+
   UserWin(0, 'STATIC',
 {$IFDEF LANG_CHS}
   '目标文件:'
@@ -194,12 +225,21 @@ begin
   'Target:'
 {$ENDIF}
   , WS_VISIBLE or WS_CHILD, rect.Left + 8, 33, 60, 16, MainWnd, IDC_SRCFILE, hInstance, nil);
-  DstFileWnd := UserWin(WS_EX_CLIENTEDGE, 'EDIT', nil, WS_VISIBLE or WS_CHILD,
+  DstFileWnd := UserWin(WS_EX_CLIENTEDGE, 'EDIT', nil, WS_VISIBLE or WS_CHILD or ES_READONLY or ES_AUTOHSCROLL,
     rect.Left + 70, 30, rect.Right - rect.Left - 140, 20, MainWnd, IDC_DSTFILE,
     hInstance, nil);
   DstFileBtn := UserWin(0, 'BUTTON', '...', WS_VISIBLE or WS_CHILD or
     BS_PUSHBUTTON, rect.Right - rect.Left - 68, 30, 60, 20, MainWnd, IDC_DSTBTN,
     hInstance, nil);
+
+  UserWin(0, 'STATIC',
+{$IFDEF LANG_CHS}
+  '补丁说明:'
+{$ELSE}
+  'Description:'
+{$ENDIF}
+  , WS_VISIBLE or WS_CHILD, rect.Left + 8, 55, rect.Right - rect.Left - 16, 16, MainWnd, IDC_SRCFILE, hInstance, nil);
+
   ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left,
     rect.Bottom - 18, rect.Right - rect.Left, 18, MainWnd, IDC_PROGRESS,
     hInstance, nil);
@@ -233,3 +273,4 @@ begin
 end;
 
 end.
+

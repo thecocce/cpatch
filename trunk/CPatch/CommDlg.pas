@@ -1,3 +1,8 @@
+{$WARN SYMBOL_PLATFORM OFF}
+{$Q-}
+{$R-}
+{$T-}
+
 unit CommDlg;
 
 interface
