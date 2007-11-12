@@ -14,11 +14,13 @@ implementation
 
 uses
   Windows,
+  RichEdit,
   Messages,
   ShellAPI,
   FastMM4,
   CommDlg,
-  ComCtl32;
+  ComCtl32,
+  PatchGen;
 
 const
   IDC_SRCFILE = 101;
@@ -33,7 +35,48 @@ const
   MAIN_HEIGHT = 450;
 
 var
-  MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, GoBtnWnd, ProgWnd: HWND;
+  MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, DescWnd, GoBtnWnd, ProgWnd: HWND;
+
+function ProcessMessage: Integer;
+var Msg: TMsg;
+begin
+   Result := 0;
+   if PeekMessage( Msg, 0, 0, 0, PM_REMOVE ) then
+   begin
+      if Msg.message <> 0 then
+        Result := 2;
+      if (Msg.message = WM_QUIT) then
+      begin
+        Result := 1;
+      end
+      else
+      begin
+        TranslateMessage( Msg );
+        DispatchMessage( Msg );
+      end;
+   end;
+end;
+
+function ProcessMessages: Boolean;
+var
+  r: Integer;
+begin
+  repeat
+    r := ProcessMessage;
+  until r < 2;
+  Result := r = 0;
+end;
+
+function GPCallback(OP: Integer; Value: UINT64): Boolean;
+begin
+  case OP of
+  GPO_LENGTH:
+    SendMessage(ProgWnd, PBM_SETRANGE32, 0, Value div 256);
+  GPO_POSITION:
+    SendMessage(ProgWnd, PBM_SETPOS, Value div 256, 0);
+  end;
+  result := ProcessMessages;
+end;
 
 function WndProc(hWnd: HWND; message: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 var
@@ -41,6 +84,7 @@ var
   szFile: packed array [0..259] of WCHAR;
   point: TPoint;
   FWnd: Cardinal;
+  orgfn, newfn: array [0..259] of WideChar;
 begin
 	case message of
 	WM_COMMAND:
@@ -51,35 +95,42 @@ begin
           case LOWORD(wParam) of
           IDC_GOBTN:
             begin
-{					char ofn[260], nfn[260];
-					int i = 0;
-					GetWindowText(hF1, ofn, 260);
-					sprintf(nfn, "%s.bak", ofn);
-					while(MoveFile(ofn, nfn) == FALSE)
-						sprintf(nfn, "%s.b%02d", ofn, i ++);
-					if(xd3_patch(nfn, lfn, patchoff, ofn) == -1)
-					begin
-						DeleteFile(ofn);
-						MoveFile(nfn, ofn);
-#ifdef LANG_CHS
-						MessageBox(hWnd, "应用补丁失败!", "错误", 0);
-#else
-						MessageBox(hWnd, "Failed to apply patch!", "Error", 0);
-#endif
-					end
-					else
-					begin
-						if(SendMessage(hBak, BM_GETCHECK, 0, 0) != BST_CHECKED)
-						begin
-							DeleteFile(nfn);
-						end;
-#ifdef LANG_CHS
-						MessageBox(hWnd, "应用补丁成功!", "成功", 0);
-#else
-						MessageBox(hWnd, "Applied patch!", "Success", 0);
-#endif
-					end;
-          }
+    					ZeroMemory(@ofn, sizeof(ofn));
+    					ofn.lStructSize := sizeof(ofn);
+		    			ofn.hwndOwner := hWnd;
+				    	ofn.lpstrFile := szFile;
+    					ofn.lpstrFile[0] := #0;
+    					ofn.nMaxFile := sizeof(szFile);
+		    			ofn.lpstrFilter := 'exe files'#0'*.exe'#0;
+				    	ofn.nFilterIndex := 1;
+    					ofn.lpstrFileTitle := nil;
+		    			ofn.nMaxFileTitle := 0;
+				    	ofn.lpstrInitialDir := nil;
+    					ofn.Flags := OFN_PATHMUSTEXIST or OFN_OVERWRITEPROMPT;
+
+              if GetSaveFileNameW(ofn) then
+              begin
+                GetWindowTextW(SrcFileWnd, orgfn, 260);
+                GetWindowTextW(DstFileWnd, newfn, 260);
+                if not GeneratePatch(ofn.lpstrFile, orgfn, newfn, GPCallback) then
+                  MessageBox(hWnd,
+{$IFDEF LANG_CHS}
+                    '制作补丁失败!', '错误'
+{$ELSE}
+                    'Failed to create patch!', 'Error'
+{$ENDIF}
+                    , 0)
+                else
+                begin
+                  MessageBox(hWnd,
+{$IFDEF LANG_CHS}
+                    '补丁生成成功!', '成功'
+{$ELSE}
+                    'Generated patch!', 'Success'
+{$ENDIF}
+                    , 0);
+                end;
+              end;
             end;
           IDC_SRCBTN, IDC_DSTBTN:
             begin
@@ -210,12 +261,12 @@ begin
 {$ELSE}
   'Original:'
 {$ENDIF}
-  , WS_VISIBLE or WS_CHILD, rect.Left + 8, 11, 60, 16, MainWnd, IDC_SRCFILE, hInstance, nil);
+  , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 11, 60, 16, MainWnd, 0, hInstance, nil);
   SrcFileWnd := UserWin(WS_EX_CLIENTEDGE, 'EDIT', nil, WS_VISIBLE or WS_CHILD or ES_READONLY or ES_AUTOHSCROLL,
-    rect.Left + 70, 8, rect.Right - rect.Left - 140, 20, MainWnd, IDC_SRCFILE,
+    rect.Left + 70, rect.Top + 8, rect.Right - rect.Left - 140, 20, MainWnd, IDC_SRCFILE,
     hInstance, nil);
   SrcFileBtn := UserWin(0, 'BUTTON', '...', WS_VISIBLE or WS_CHILD or
-    BS_PUSHBUTTON, rect.Right - rect.Left - 68, 8, 60, 20, MainWnd, IDC_SRCBTN,
+    BS_PUSHBUTTON, rect.Right - rect.Left - 68, rect.Top + 8, 60, 20, MainWnd, IDC_SRCBTN,
     hInstance, nil);
 
   UserWin(0, 'STATIC',
@@ -224,12 +275,12 @@ begin
 {$ELSE}
   'Target:'
 {$ENDIF}
-  , WS_VISIBLE or WS_CHILD, rect.Left + 8, 33, 60, 16, MainWnd, IDC_SRCFILE, hInstance, nil);
+  , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 33, 60, 16, MainWnd, 0, hInstance, nil);
   DstFileWnd := UserWin(WS_EX_CLIENTEDGE, 'EDIT', nil, WS_VISIBLE or WS_CHILD or ES_READONLY or ES_AUTOHSCROLL,
     rect.Left + 70, 30, rect.Right - rect.Left - 140, 20, MainWnd, IDC_DSTFILE,
     hInstance, nil);
   DstFileBtn := UserWin(0, 'BUTTON', '...', WS_VISIBLE or WS_CHILD or
-    BS_PUSHBUTTON, rect.Right - rect.Left - 68, 30, 60, 20, MainWnd, IDC_DSTBTN,
+    BS_PUSHBUTTON, rect.Right - rect.Left - 68, rect.Top + 30, 60, 20, MainWnd, IDC_DSTBTN,
     hInstance, nil);
 
   UserWin(0, 'STATIC',
@@ -238,7 +289,16 @@ begin
 {$ELSE}
   'Description:'
 {$ENDIF}
-  , WS_VISIBLE or WS_CHILD, rect.Left + 8, 55, rect.Right - rect.Left - 16, 16, MainWnd, IDC_SRCFILE, hInstance, nil);
+  , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 55, rect.Right - rect.Left - 16, 16, MainWnd, 0, hInstance, nil);
+
+  DescWnd := UserWin(0, RICHEDIT_CLASSNAME, nil, WS_VISIBLE or WS_CHILD or ES_AUTOHSCROLL or ES_AUTOVSCROLL or ES_WANTRETURN or WS_HSCROLL or WS_VSCROLL or ES_MULTILINE,
+    1, 1, rect.Right - rect.Left - 18, rect.Bottom - rect.Top - 117,
+    UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 73, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 115, MainWnd, 0, hInstance, nil),
+    IDC_DESC, hInstance, nil);
+
+  GoBtnWnd := UserWin(0, 'BUTTON', 'GO!', WS_VISIBLE or WS_CHILD or
+    BS_PUSHBUTTON, (rect.Right - rect.Left - 80) div 2, rect.Bottom - 40, 80, 20, MainWnd, IDC_GOBTN,
+    hInstance, nil);
 
   ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left,
     rect.Bottom - 18, rect.Right - rect.Left, 18, MainWnd, IDC_PROGRESS,
@@ -265,7 +325,7 @@ end;
 
 procedure Maker_Main;
 begin
-  InitCommonControlsEx($20);
+  InitCommonControlsEx($FFFF);
   g_font := GetAFont;
   InitWindows;
   MessageLoop;

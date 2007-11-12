@@ -9,6 +9,9 @@ interface
 uses
   Windows, Messages;
 
+var
+  RICHEDIT_CLASSNAME: PWideChar;
+
 type
   {$EXTERNALSYM PBRANGE}
   PBRANGE = record
@@ -33,7 +36,7 @@ const
   PBS_SMOOTH              = 01;
   {$EXTERNALSYM PBS_VERTICAL}
   PBS_VERTICAL            = 04;
-  
+
   {$EXTERNALSYM PBM_SETRANGE}
   PBM_SETRANGE            = WM_USER+1;
   {$EXTERNALSYM PBM_SETPOS}
@@ -87,6 +90,13 @@ const
   {$EXTERNALSYM PBST_PAUSED}
   PBST_PAUSED             = $0003;
 
+  EDITPartFiller0 = 0;
+  {$EXTERNALSYM EDITPartFiller0}
+  EP_EDITTEXT = 1;
+  {$EXTERNALSYM EP_EDITTEXT}
+  EP_CARET = 2;
+  {$EXTERNALSYM EP_CARET}
+
 type
   TInitCommonControlsEx = packed record
     dwSize: DWORD;
@@ -96,15 +106,29 @@ type
 
 procedure InitCommonControls; external 'comctl32.dll' name 'InitCommonControls';
 
-var ComCtl32_Module: HModule;
 procedure InitCommonControlsEx( dwICC: DWORD );
 
 implementation
+
+var
+  ComCtl32_Module, RichEdit_Module: HModule;
+
 procedure InitCommonControlsEx( dwICC: DWORD );
 var Proc: procedure( ICC: PInitCommonControlsEx ); stdcall;
     ICC: TInitCommonControlsEx;
 begin
   InitCommonControls;
+  if RichEdit_Module = 0 then
+  begin
+    RichEdit_Module := LoadLibrary( 'msftedit' );
+    if RichEdit_Module = 0 then
+    begin
+      RichEdit_Module := LoadLibrary( 'riched20' );
+      RICHEDIT_CLASSNAME := 'RichEdit20W';
+    end
+    else
+      RICHEDIT_CLASSNAME := 'RichEdit50W';
+  end;
   if ComCtl32_Module = 0 then
     ComCtl32_Module := LoadLibrary( 'comctl32' );
   @ Proc := GetProcAddress( ComCtl32_Module, 'InitCommonControlsEx' );

@@ -11,7 +11,8 @@ program CPatchMaker;
 uses
   Maker in 'Maker.pas',
   ComCtl32 in 'ComCtl32.pas',
-  CommDlg in 'CommDlg.pas';
+  CommDlg in 'CommDlg.pas',
+  PatchGen in 'PatchGen.pas';
 
 begin
   Maker_Main;
