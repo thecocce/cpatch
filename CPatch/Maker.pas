@@ -71,7 +71,10 @@ function GPCallback(OP: Integer; Value: UINT64): Boolean;
 begin
   case OP of
   GPO_LENGTH:
+  begin
     SendMessage(ProgWnd, PBM_SETRANGE32, 0, Value div 256);
+    SendMessage(ProgWnd, PBM_SETPOS, 0, 0);
+  end;
   GPO_POSITION:
     SendMessage(ProgWnd, PBM_SETPOS, Value div 256, 0);
   end;
