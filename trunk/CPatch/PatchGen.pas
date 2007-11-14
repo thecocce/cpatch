@@ -16,15 +16,15 @@ const
   GPO_LENGTH = 0;
   GPO_POSITION = 1;
 
-function GeneratePatch(const pfile, sfile, dfile: PWideChar; gpcb: TGPCallback):Boolean;
+function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback):Boolean;
 
 implementation
 
-function GeneratePatch(const pfile, sfile, dfile: PWideChar; gpcb: TGPCallback): Boolean;
+function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback): Boolean;
 const
   BUF_SIZE = 256 * 1024;
 var
-  pf, sf, df: THandle;
+  sf, df: THandle;
   Buf1, Buf2, pbuf: array of Byte;
   size, hsize, i, r, poff: Cardinal;
   dsize, off, loff: UINT64;
@@ -68,12 +68,10 @@ var
 
 begin
   result := false;
-  pf := CreateFileW(pfile, GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
   sf := CreateFileW(sfile, GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
   df := CreateFileW(dfile, GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-  if (pf = INVALID_HANDLE_VALUE) or (sf = INVALID_HANDLE_VALUE) or (df = INVALID_HANDLE_VALUE) then
+  if (sf = INVALID_HANDLE_VALUE) or (df = INVALID_HANDLE_VALUE) then
   begin
-    CloseHandle(pf);
     CloseHandle(sf);
     CloseHandle(df);
     Exit;
@@ -85,6 +83,7 @@ begin
   SetFilePointer(df, 0, nil, FILE_BEGIN);
   if (@gpcb = nil) or gpcb(GPO_LENGTH, dsize) then
   begin
+    result := true;
     WriteFile(pf, dsize, sizeof(dsize), size, nil);
     SetLength(Buf1, BUF_SIZE);
     SetLength(Buf2, BUF_SIZE);
@@ -99,7 +98,10 @@ begin
       ZeroMemory(@Buf2[0], BUF_SIZE);
       ReadFile(sf, Buf1[0], BUF_SIZE, size, nil);
       if not ReadFile(df, Buf2[0], BUF_SIZE, size, nil) then
+      begin
+        result := false;
         break;
+      end;
       for i := 0 to size - 1 do
       begin
         if Buf1[i] <> Buf2[i] then
@@ -134,7 +136,10 @@ begin
       end;
       Inc(off, size);
       if (@gpcb <> nil) and not gpcb(GPO_POSITION, off) then
+      begin
+        result := false;
         break;
+      end;
     end;
     if inp then
     begin
@@ -144,9 +149,7 @@ begin
     end;
     Finalize(Buf1);
     Finalize(Buf2);
-    result := true;
   end;
-  CloseHandle(pf);
   CloseHandle(sf);
   CloseHandle(df);
 end;

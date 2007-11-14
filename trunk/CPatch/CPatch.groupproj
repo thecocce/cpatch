@@ -4,31 +4,43 @@
   </PropertyGroup>
   <ItemGroup />
   <ItemGroup>
-    <Projects Include="CPatchMaker.bdsproj" />
+    <Projects Include="CPatchHeader.dproj" />
+    <Projects Include="CPatchMaker.bdsproj">
+      <Dependencies>CPatchHeader.dproj</Dependencies>
+    </Projects>
   </ItemGroup>
   <ProjectExtensions>
     <Borland.Personality>Default.Personality</Borland.Personality>
     <Borland.ProjectType />
     <BorlandProject>
-  <BorlandProject xmlns=""> <Default.Personality> </Default.Personality> </BorlandProject></BorlandProject>
+<BorlandProject xmlns=""><Default.Personality></Default.Personality></BorlandProject></BorlandProject>
   </ProjectExtensions>
-  <Target Name="CPatchMaker">
+  <Target Name="CPatchMaker" DependsOnTargets="CPatchHeader">
     <MSBuild Projects="CPatchMaker.bdsproj" Targets="" />
   </Target>
-  <Target Name="CPatchMaker:Clean">
+  <Target Name="CPatchMaker:Clean" DependsOnTargets="CPatchHeader:Clean">
     <MSBuild Projects="CPatchMaker.bdsproj" Targets="Clean" />
   </Target>
-  <Target Name="CPatchMaker:Make">
+  <Target Name="CPatchMaker:Make" DependsOnTargets="CPatchHeader:Make">
     <MSBuild Projects="CPatchMaker.bdsproj" Targets="Make" />
   </Target>
+  <Target Name="CPatchHeader">
+    <MSBuild Projects="CPatchHeader.dproj" Targets="" />
+  </Target>
+  <Target Name="CPatchHeader:Clean">
+    <MSBuild Projects="CPatchHeader.dproj" Targets="Clean" />
+  </Target>
+  <Target Name="CPatchHeader:Make">
+    <MSBuild Projects="CPatchHeader.dproj" Targets="Make" />
+  </Target>
   <Target Name="Build">
-    <CallTarget Targets="CPatchMaker" />
+    <CallTarget Targets="CPatchMaker;CPatchHeader" />
   </Target>
   <Target Name="Clean">
-    <CallTarget Targets="CPatchMaker:Clean" />
+    <CallTarget Targets="CPatchMaker:Clean;CPatchHeader:Clean" />
   </Target>
   <Target Name="Make">
-    <CallTarget Targets="CPatchMaker:Make" />
+    <CallTarget Targets="CPatchMaker:Make;CPatchHeader:Make" />
   </Target>
   <Import Condition="Exists('$(MSBuildBinPath)\Borland.Group.Targets')" Project="$(MSBuildBinPath)\Borland.Group.Targets" />
 </Project>
