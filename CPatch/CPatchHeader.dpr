@@ -5,17 +5,17 @@
 {$R-}
 {$T-}
 
-program CPatchMaker;
+program CPatchHeader;
 
 {$R 'resource.res' 'resource.rc'}
-{$R 'headerdata.res' 'headerdata.rc'}
+
 uses
-  Maker in 'Maker.pas',
+  Windows,
   ComCtl32 in 'ComCtl32.pas',
   CommDlg in 'CommDlg.pas',
-  PatchGen in 'PatchGen.pas';
+  Header in 'Header.pas',
+  Patcher in 'Patcher.pas';
 
 begin
-  Maker_Main;
+  Header_Main;
 end.
-
