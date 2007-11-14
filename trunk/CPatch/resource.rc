@@ -41,4 +41,30 @@ BEGIN
 '3C 2F 61 73 73 65 6D 62 6C 79 3E 0D 0A '
 END
 
+1 VERSIONINFO
+FILEVERSION 0,1,0,1
+PRODUCTVERSION 0,1,0,1
+FILEOS VOS_UNKNOWN
+FILETYPE VFT_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "\0"
+      VALUE "FileVersion", "0.1.0.1\0"
+      VALUE "FileDescription", "\0"
+      VALUE "InternalName", "CPatch\0"
+      VALUE "LegalCopyright", "\0"
+      VALUE "LegalTrademarks", "\0"
+      VALUE "OriginalFilename", "\0"
+      VALUE "ProductName", "CPatch\0"
+      VALUE "ProductVersion", "0.1.0.1\0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 1033, 1200
+  END
+END
 
