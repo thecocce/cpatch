@@ -83,6 +83,27 @@ begin
   result := ProcessMessages;
 end;
 
+type
+  PDesc = ^TDesc;
+  TDesc = packed record
+    desc: array of Byte;
+    size: Integer;
+  end;
+
+function sicb(dwCookie: Longint; pbBuff: PByte;
+  cb: Longint; var pcb: Longint): Longint; stdcall;
+var
+  desc: PDesc;
+begin
+  desc := PDesc(dwCookie);
+  result := 0;
+  while Length(desc.desc) < desc.size + cb do
+    SetLength(desc.desc, Length(desc.desc) + 256);
+  Move(pbBuff^, desc.desc[desc.size], cb);
+  Inc(desc.size, cb);
+  pcb := cb;
+end;
+
 function WndProc(hWnd: HWND; message: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 var
   ofn: OPENFILENAMEW;
@@ -91,10 +112,13 @@ var
   FWnd, size, w: Cardinal;
   orgfn, newfn: array [0..259] of WideChar;
   pf: THandle;
-  desc: array of WideChar;
   hrsrc: Cardinal;
   hres: HGLOBAL;
-  const Magic: ShortString = 'PATCHDAT';
+  es: TEditStream;
+  desc: TDesc;
+
+const
+  Magic: ShortString = 'PATCHDAT';
 begin
 	case message of
 	WM_COMMAND:
@@ -129,13 +153,16 @@ begin
                 WriteFile(pf, LockResource(hres)^, size, w, nil);
                 UnlockResource(hres);
                 FreeResource(hrsrc);
-                size := GetWindowTextLengthW(DescWnd);
-                SetLength(desc, size + 1);
-                GetWindowTextW(DescWnd, @desc[0], size + 1);
+                SetLength(desc.desc, 256);
+                desc.size := 0;
+                es.dwError := 0;
+                es.dwCookie := Integer(@desc);
+                es.pfnCallback := sicb;
+                SendMessage(DescWnd, EM_STREAMOUT, SF_RTF or SF_USECODEPAGE or (CP_UTF8 shl 16), Cardinal(@es));
                 WriteFile(pf, Magic[1], 8, w, nil);
-                WriteFile(pf, size, 4, w, nil);
-                WriteFile(pf, desc[0], size * 2, w, nil);
-                Finalize(desc);
+                WriteFile(pf, desc.size, 4, w, nil);
+                WriteFile(pf, desc.desc[0], desc.size, w, nil);
+                Finalize(desc.desc);
                 if not GeneratePatch(pf, orgfn, newfn, GPCallback) then
                 begin
                   CloseHandle(pf);

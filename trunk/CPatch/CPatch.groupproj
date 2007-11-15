@@ -5,7 +5,7 @@
   <ItemGroup />
   <ItemGroup>
     <Projects Include="CPatchHeader.dproj" />
-    <Projects Include="CPatchMaker.bdsproj">
+    <Projects Include="CPatchMaker.dproj">
       <Dependencies>CPatchHeader.dproj</Dependencies>
     </Projects>
   </ItemGroup>
@@ -16,13 +16,13 @@
 <BorlandProject xmlns=""><Default.Personality></Default.Personality></BorlandProject></BorlandProject>
   </ProjectExtensions>
   <Target Name="CPatchMaker" DependsOnTargets="CPatchHeader">
-    <MSBuild Projects="CPatchMaker.bdsproj" Targets="" />
+    <MSBuild Projects="CPatchMaker.dproj" Targets="" />
   </Target>
   <Target Name="CPatchMaker:Clean" DependsOnTargets="CPatchHeader:Clean">
-    <MSBuild Projects="CPatchMaker.bdsproj" Targets="Clean" />
+    <MSBuild Projects="CPatchMaker.dproj" Targets="Clean" />
   </Target>
   <Target Name="CPatchMaker:Make" DependsOnTargets="CPatchHeader:Make">
-    <MSBuild Projects="CPatchMaker.bdsproj" Targets="Make" />
+    <MSBuild Projects="CPatchMaker.dproj" Targets="Make" />
   </Target>
   <Target Name="CPatchHeader">
     <MSBuild Projects="CPatchHeader.dproj" Targets="" />
