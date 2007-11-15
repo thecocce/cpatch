@@ -253,7 +253,7 @@ begin
     BS_PUSHBUTTON, rect.Right - rect.Left - 88, rect.Bottom - 53, 80, 20, MainWnd, IDC_SRCBTN,
     hInstance, nil);
 
-  DescWnd := UserWin(WS_EX_TRANSPARENT, RICHEDIT_CLASSNAME, nil, WS_VISIBLE or WS_CHILD or ES_AUTOHSCROLL or ES_AUTOVSCROLL or ES_WANTRETURN or WS_HSCROLL or WS_VSCROLL or ES_MULTILINE or ES_READONLY,
+  DescWnd := UserWin(WS_EX_TRANSPARENT, RICHEDIT_CLASSNAME, nil, WS_VISIBLE or WS_CHILD or ES_AUTOVSCROLL or ES_WANTRETURN or WS_VSCROLL or ES_MULTILINE or ES_READONLY,
     1, 1, rect.Right - rect.Left - 18, rect.Bottom - rect.Top - 67,
     UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 8, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 65, MainWnd, 0, hInstance, nil),
     IDC_DESC, hInstance, nil);

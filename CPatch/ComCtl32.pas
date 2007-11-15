@@ -22,6 +22,7 @@ type
   TPBRange = PBRANGE;
 
 const
+  SF_USECODEPAGE = $20;
   PROGRESS_CLASS = 'msctls_progress32';
 
   {$EXTERNALSYM CCM_FIRST}
