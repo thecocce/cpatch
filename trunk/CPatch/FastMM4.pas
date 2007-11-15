@@ -674,55 +674,8 @@ interface
   {$define AssumeMultiThreaded}
 {$endif}
 
-{Delphi versions}
-{$ifndef BCB}
-  {$ifdef ver120}
-    {$define Delphi4or5}
-  {$endif}
-  {$ifdef ver130}
-    {$define Delphi4or5}
-  {$endif}
-  {$ifdef ver140}
-    {$define Delphi6}
-  {$endif}
-  {$ifdef ver150}
-    {$define Delphi7}
-  {$endif}
-  {$ifdef ver170}
-    {$define Delphi2005}
-  {$endif}
-{$else}
-  {Cannot uninstall safely under BCB}
-  {$define NeverUninstall}
-  {Disable memory leak reporting}
-  {$undef EnableMemoryLeakReporting}
-  {for BCB5, use the Delphi 5 codepath}
-  {$ifdef ver130}
-    {$define Delphi4or5}
-  {$endif}
-{$endif}
-{$ifdef ver180}
-  {$define BDS2006}
-{$endif}
-
-{$ifndef Delphi4or5}
-  {$ifndef BCB}
-    {$define Delphi6AndUp}
-  {$endif}
-  {$ifndef Delphi6}
-    {$define BCB6OrDelphi7AndUp}
-    {$ifndef BCB}
-      {$define Delphi7AndUp}
-    {$endif}
-    {$ifndef BCB}
-      {$ifndef Delphi7}
-        {$ifndef Delphi2005}
-          {$define BDS2006AndUp}
-        {$endif}
-      {$endif}
-    {$endif}
-  {$endif}
-{$endif}
+{$define Delphi7}
+{$define Delphi6AndUp}
 
 {$ifdef Delphi6AndUp}
   {$WARN SYMBOL_PLATFORM OFF}
@@ -1035,7 +988,7 @@ const
   {Hexadecimal characters}
   HexTable: array[0..15] of char = '0123456789ABCDEF';
   {Copyright message - not used anywhere in the code}
-  Copyright: string = 'FastMM4 © 2004, 2005, 2006 Pierre le Riche / Professional Software Development';
+  Copyright: string = 'FastMM4 ?2004, 2005, 2006 Pierre le Riche / Professional Software Development';
 
 {-------------------------Private types----------------------------}
 type
