@@ -1774,7 +1774,7 @@ const
   kernel = 'kernel32.dll';
   user = 'user32.dll';
   oleaut = 'oleaut32.dll';
-  
+
 function GetProcessHeap; external kernel name 'GetProcessHeap';
 function HeapAlloc; stdcall; external kernel name 'HeapAlloc';
 function HeapReAlloc; stdcall; external kernel name 'HeapReAlloc';
@@ -2127,7 +2127,7 @@ function _fxstat(Version: Integer; Handle: Integer; var Stat: TStatStruct): Inte
 
 function __xstat(Ver: Integer; FileName: PChar; var StatBuffer: TStatStruct): Integer; cdecl;
   external libc name '__xstat';
-  
+
 function _strlen(P: PChar): Integer; cdecl;
   external libc name 'strlen';
 
@@ -10041,7 +10041,7 @@ asm
         { ->    EAX obj : Exception object }
         {       [RA]  desc: ^TExcDesc }
         { <-    Doesn't return }
-       
+
         // Mark the exception as being handled
         OR      [EAX].TRaisedException.Flags, excIsBeingHandled
 
@@ -12848,7 +12848,7 @@ asm
         DB      0
 @@handle0:
         MOV     EAX,offset @@zeroByte
-{$ENDIF}             
+{$ENDIF}
 end;
 {$ENDIF}
 

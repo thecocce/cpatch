@@ -223,7 +223,7 @@ var
   cx, cy: Integer;
   rect: TRect;
   size, r: Cardinal;
-  wt: array of WideChar;
+  wt: array of Byte;
 begin
 	MyRegisterClass(hInstance);
  	cx := GetSystemMetrics(SM_CXSCREEN);
@@ -274,7 +274,7 @@ begin
 
   ReadFile(pf, size, 4, r, nil);
   SetLength(wt, size + 1);
-  ReadFile(pf, wt[0], size * 2, r, nil);
+  ReadFile(pf, wt[0], size, r, nil);
   patchoff := SetFilePointer(pf, 0, nil, FILE_CURRENT);
   SetWindowTextW(DescWnd, @wt[0]);
   Finalize(wt);
