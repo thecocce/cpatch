@@ -20,12 +20,14 @@ function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: T
 
 implementation
 
-function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback): Boolean;
 const
   BUF_SIZE = 256 * 1024;
+
+function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback): Boolean;
 var
   sf, df: THandle;
-  Buf1, Buf2, pbuf: array of Byte;
+  Buf1, Buf2: array of Byte;
+  pbuf: packed array [0..$7FFF] of Byte;
   size, hsize, i, r, poff: Cardinal;
   dsize, off, loff: UINT64;
   inp: Boolean;
@@ -43,10 +45,17 @@ var
     end;
   end;
 
-  procedure WriteOff(const value: Cardinal);
+  procedure WriteOff(value: UINT64);
   var
-    w, v: Cardinal;
+    w, v, p: Cardinal;
   begin
+    while value > $FFFFFFFF do
+    begin
+      p := $FFFFFFFF;
+      WriteFile(pf, p, 4, w, nil);
+      WriteSize(0);
+      Dec(value, $FFFFFFFF);
+    end;
     if value < $40 then
       WriteFile(pf, value, 1, w, nil)
     else if value < $4000 then
@@ -85,9 +94,12 @@ begin
   begin
     result := true;
     WriteFile(pf, dsize, sizeof(dsize), size, nil);
-    SetLength(Buf1, BUF_SIZE);
-    SetLength(Buf2, BUF_SIZE);
-    SetLength(pbuf, $8000);
+    SetLength(Buf1, BUF_SIZE + 2);
+    SetLength(Buf2, BUF_SIZE + 2);
+    Buf1[BUF_SIZE] := 0;
+    Buf1[BUF_SIZE + 1] := 0;
+    Buf2[BUF_SIZE] := 1;
+    Buf2[BUF_SIZE + 1] := 1;
     off := 0;
     poff := 0;
     loff := 0;
@@ -102,19 +114,20 @@ begin
         result := false;
         break;
       end;
-      for i := 0 to size - 1 do
+      i := 0;
+      while i < size do
       begin
         if Buf1[i] <> Buf2[i] then
         begin
           if not inp then
           begin
-            WriteOff(off + i - loff);
+            WriteOff(off + UINT64(i) - loff);
             loff := off + i;
             inp := true;
           end;
           pbuf[poff] := Buf2[i];
           Inc(poff);
-          if poff = BUF_SIZE then
+          if poff = $7FFF then
           begin
             inp := false;
             hsize := off + i + 1 - loff;
@@ -126,13 +139,35 @@ begin
         end
         else if inp then
         begin
-          inp := false;
-          hsize := off + i - loff;
-          WriteSize(hsize);
-          WriteFile(pf, pbuf[0], hsize, r, nil);
-          loff := off + i;
-          poff := 0;
+          if (Buf1[i + 1] = Buf2[i + 1]) or (Buf1[i + 2] = Buf2[i + 2]) then
+          begin
+            pbuf[poff] := Buf2[i];
+            Inc(poff);
+            Inc(i);
+            pbuf[poff] := Buf2[i];
+            Inc(poff);
+            Inc(i);
+            if poff = $7FFF then
+            begin
+              inp := false;
+              hsize := off + i + 1 - loff;
+              WriteSize(hsize);
+              WriteFile(pf, pbuf[0], hsize, r, nil);
+              loff := off + i + 1;
+              poff := 0;
+            end;
+          end
+          else
+          begin
+            inp := false;
+            hsize := off + i - loff;
+            WriteSize(hsize);
+            WriteFile(pf, pbuf[0], hsize, r, nil);
+            loff := off + i;
+            poff := 0;
+          end;
         end;
+        Inc(i);
       end;
       Inc(off, size);
       if (@gpcb <> nil) and not gpcb(GPO_POSITION, off) then
@@ -153,6 +188,38 @@ begin
   CloseHandle(sf);
   CloseHandle(df);
 end;
+
+{function CompressBlock(data: array of Byte; var size: Cardinal): Boolean;
+var
+  dest: array [0..$FFFF] of Byte;
+  soff, doff: Cardinal;
+  match: boolean;
+begin
+  result := false;
+  if size < 8 then
+    exit;
+  soff := 0;
+  doff := 0;
+  while soff < size do
+  begin
+    match := false;
+    if soff >= 8 then
+    begin
+
+    end;
+    if not match then
+    begin
+      dest[doff] := data[soff];;
+      Inc(doff);
+      if dest[doff] = $CA then
+      begin
+        dest[doff] := $0;
+        Inc(doff);
+      end;
+      Inc(soff);
+    end;
+  end;
+end;}
 
 end.
 
