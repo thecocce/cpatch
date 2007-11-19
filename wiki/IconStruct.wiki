@@ -1,5 +1,5 @@
+#summary Resolved the structure of Windows icon
 #labels Phase-Implementation
-# Resolved the structure of Windows icon
 
 = Introduction =
 
