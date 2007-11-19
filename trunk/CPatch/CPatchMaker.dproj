@@ -34,14 +34,15 @@
       <MainSource>MainSource</MainSource>
     </DelphiCompile>
     <RcCompile Include="headerdata.rc">
-      <Form>headerdata.res</Form>
+      <Form>'headerdata.res'</Form>
     </RcCompile>
     <RcCompile Include="resource.rc">
-      <Form>resource.res</Form>
+      <Form>'resource.res'</Form>
     </RcCompile>
     <DCCReference Include="ComCtl32.pas" />
     <DCCReference Include="CommDlg.pas" />
     <DCCReference Include="Maker.pas" />
     <DCCReference Include="PatchGen.pas" />
+    <DCCReference Include="UpdateIcon.pas" />
   </ItemGroup>
 </Project>

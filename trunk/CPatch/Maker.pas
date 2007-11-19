@@ -20,6 +20,7 @@ uses
   FastMM4,
   CommDlg,
   ComCtl32,
+  UpdateIcon,
   PatchGen;
 
 const
@@ -27,16 +28,19 @@ const
   IDC_DSTFILE = 102;
   IDC_SRCBTN = 103;
   IDC_DSTBTN = 104;
-  IDC_DESC = 105;
-  IDC_GOBTN = 106;
-  IDC_PROGRESS = 107;
+  IDC_ICONBTN = 105;
+  IDC_DESC = 106;
+  IDC_GOBTN = 107;
+  IDC_PROGRESS = 108;
 
   MAIN_WIDTH = 500;
   MAIN_HEIGHT = 450;
 
 var
-  MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, DescWnd, GoBtnWnd, ProgWnd: HWND;
+  MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, IconBtn, DescWnd, GoBtnWnd, ProgWnd: HWND;
   Terminated: Boolean;
+  icon: HICON;
+  iconf: packed array [0..259] of WideChar;
 
 function ProcessMessage: Integer;
 var Msg: TMsg;
@@ -104,6 +108,25 @@ begin
   pcb := cb;
 end;
 
+type
+  PHICON = ^HICON;
+
+function MyExtractIconExW(lpszFile: PWideChar; nIconIndex: Integer;
+  phiconLarge, phiconSmall: PHICON; nIcons: UINT): UINT; stdcall; external 'shell32.dll' name 'ExtractIconExW';
+
+procedure ExtIcons(fn: PWideChar);
+var
+  icount: integer;
+begin
+  icount := MyExtractIconExW(fn, -1, nil, nil, 0);
+  if icount > 0 then
+  begin
+    DestroyIcon(icon);
+    MyExtractIconExW(fn, 0, @icon, nil, 1);
+    lstrcpyW(@iconf[0], fn);
+  end;
+end;
+
 function WndProc(hWnd: HWND; message: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 var
   ofn: OPENFILENAMEW;
@@ -116,17 +139,44 @@ var
   hres: HGLOBAL;
   es: TEditStream;
   desc: TDesc;
-
+  dc: HDC;
+  ps: TPaintStruct;
 const
   Magic: ShortString = 'PATCHDAT';
 begin
 	case message of
+  WM_PAINT:
+    begin
+      dc := BeginPaint(MainWnd, ps);
+      DrawIconEx(dc, 200, 55, icon, 32, 32, 0, 0, DI_NORMAL);
+      EndPaint(MainWnd, ps);
+    end;
 	WM_COMMAND:
     begin
       case HIWORD(wParam) of
       BN_CLICKED:
         begin
           case LOWORD(wParam) of
+          IDC_ICONBTN:
+            begin
+    					ZeroMemory(@ofn, sizeof(ofn));
+    					ofn.lStructSize := sizeof(ofn);
+		    			ofn.hwndOwner := hWnd;
+				    	ofn.lpstrFile := szFile;
+    					ofn.lpstrFile[0] := #0;
+    					ofn.nMaxFile := sizeof(szFile);
+		    			ofn.lpstrFilter := 'Icon files'#0'*.ico;*.exe'#0;
+				    	ofn.nFilterIndex := 1;
+    					ofn.lpstrFileTitle := nil;
+		    			ofn.nMaxFileTitle := 0;
+				    	ofn.lpstrInitialDir := nil;
+    					ofn.Flags := OFN_PATHMUSTEXIST or OFN_FILEMUSTEXIST;
+
+              if GetOpenFileNameW(ofn) then
+              begin
+                ExtIcons(ofn.lpstrFile);
+              end;
+            end;
           IDC_GOBTN:
             begin
     					ZeroMemory(@ofn, sizeof(ofn));
@@ -140,6 +190,7 @@ begin
     					ofn.lpstrFileTitle := nil;
 		    			ofn.nMaxFileTitle := 0;
 				    	ofn.lpstrInitialDir := nil;
+              ofn.lpstrDefExt := 'exe';
     					ofn.Flags := OFN_PATHMUSTEXIST or OFN_OVERWRITEPROMPT;
 
               if GetSaveFileNameW(ofn) then
@@ -153,6 +204,12 @@ begin
                 WriteFile(pf, LockResource(hres)^, size, w, nil);
                 UnlockResource(hres);
                 FreeResource(hrsrc);
+                CloseHandle(pf);
+
+                UpdateIconFromFile(@iconf[0], ofn.lpstrFile);
+
+                pf := CreateFileW(ofn.lpstrFile, GENERIC_WRITE or GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+                SetFilePointer(pf, 0, nil, FILE_END);
                 SetLength(desc.desc, 256);
                 desc.size := 0;
                 es.dwError := 0;
@@ -261,12 +318,12 @@ begin
 	wcex.cbClsExtra		:= 0;
 	wcex.cbWndExtra		:= 0;
 	wcex.hInstance		:= hInstance;
-	wcex.hIcon			:= LoadIcon(hInstance, 'MAINICON');
+	wcex.hIcon			:= LoadIconW(hInstance, 'MAINICON');
 	wcex.hCursor		:= LoadCursor(0, IDC_ARROW);
 	wcex.hbrBackground	:= HBRUSH(COLOR_BTNSHADOW);
 	wcex.lpszMenuName	:= nil;
 	wcex.lpszClassName	:= 'CPatchMaker';
-	wcex.hIconSm		:= LoadIcon(wcex.hInstance, 'MAINICONSMALL');
+	wcex.hIconSm		:= LoadIconW(wcex.hInstance, 'MAINICONSMALL');
 
 	result := RegisterClassExW(wcex);
 end;
@@ -307,6 +364,8 @@ begin
 	MyRegisterClass(hInstance);
  	cx := GetSystemMetrics(SM_CXSCREEN);
 	cy := GetSystemMetrics(SM_CYSCREEN);
+  icon := LoadIconW(hInstance, '#200');
+  lstrcpyW(iconf, PWideChar(WideString(ParamStr(0))));
 	MainWnd := UserWin(WS_EX_ACCEPTFILES, 'CPatchMaker', 'CPatch Maker', WS_OVERLAPPED or WS_CAPTION
     or WS_SYSMENU, (cx - MAIN_WIDTH) div 2, (cy - MAIN_HEIGHT) div 2, MAIN_WIDTH, MAIN_HEIGHT, 0, 0,
     hInstance, nil);
@@ -340,25 +399,35 @@ begin
     BS_PUSHBUTTON, rect.Right - rect.Left - 68, rect.Top + 30, 60, 20, MainWnd, IDC_DSTBTN,
     hInstance, nil);
 
+  IconBtn := UserWin(0, 'BUTTON',
+{$IFDEF LANG_CHS}
+    '选择图标'
+{$ELSE}
+    'Select Icon'
+{$ENDIF}
+    , WS_VISIBLE or WS_CHILD or
+    BS_PUSHBUTTON, rect.Left + 70, rect.Top + 52, 100, 20, MainWnd, IDC_ICONBTN,
+    hInstance, nil);
+
   UserWin(0, 'STATIC',
 {$IFDEF LANG_CHS}
   '补丁说明:'
 {$ELSE}
   'Description:'
 {$ENDIF}
-  , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 55, rect.Right - rect.Left - 16, 16, MainWnd, 0, hInstance, nil);
+  , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 77, 180, 16, MainWnd, 0, hInstance, nil);
 
   DescWnd := UserWin(0, RICHEDIT_CLASSNAME, nil, WS_VISIBLE or WS_CHILD or ES_AUTOHSCROLL or ES_AUTOVSCROLL or ES_WANTRETURN or WS_HSCROLL or WS_VSCROLL or ES_MULTILINE,
-    1, 1, rect.Right - rect.Left - 18, rect.Bottom - rect.Top - 117,
-    UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 73, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 115, MainWnd, 0, hInstance, nil),
+    1, 1, rect.Right - rect.Left - 18, rect.Bottom - rect.Top - 129,
+    UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 95, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 127, MainWnd, 0, hInstance, nil),
     IDC_DESC, hInstance, nil);
 
   GoBtnWnd := UserWin(0, 'BUTTON', 'GO!', WS_VISIBLE or WS_CHILD or
-    BS_PUSHBUTTON, (rect.Right - rect.Left - 80) div 2, rect.Bottom - 40, 80, 20, MainWnd, IDC_GOBTN,
+    BS_PUSHBUTTON, rect.Right - 88, rect.Bottom - 28, 80, 20, MainWnd, IDC_GOBTN,
     hInstance, nil);
 
-  ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left,
-    rect.Bottom - 18, rect.Right - rect.Left, 18, MainWnd, IDC_PROGRESS,
+  ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left + 8,
+    rect.Bottom - 28, rect.Right - rect.Left - 98, 20, MainWnd, IDC_PROGRESS,
     hInstance, nil);
   ShowWindow(MainWnd, CmdShow);
 	UpdateWindow(MainWnd);
