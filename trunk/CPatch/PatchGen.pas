@@ -146,7 +146,6 @@ begin
             Inc(i);
             pbuf[poff] := Buf2[i];
             Inc(poff);
-            Inc(i);
             if poff = $7FFF then
             begin
               inp := false;
