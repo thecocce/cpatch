@@ -16,20 +16,20 @@ const
   GPO_LENGTH = 0;
   GPO_POSITION = 1;
 
-function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback):Boolean;
+function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback; resdata: Boolean = false):Boolean;
 
 implementation
 
 const
-  BUF_SIZE = 256 * 1024;
+  BUF_SIZE = 2 * 1024 * 1024;
 
-function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback): Boolean;
+function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback; resdata: Boolean): Boolean;
 var
   sf, df: THandle;
   Buf1, Buf2: array of Byte;
-  pbuf: packed array [0..$7FFF] of Byte;
+  pbuf, rbuf: packed array [0..$7FFF] of Byte;
   size, hsize, i, r, poff: Cardinal;
-  dsize, off, loff: UINT64;
+  ssize, dsize, off, loff: UINT64;
   inp: Boolean;
 
   procedure WriteSize(const value: Cardinal);
@@ -88,12 +88,29 @@ begin
   hsize := 0;
   dsize := SetFilePointer(df, 0, @hsize, FILE_END);
   dsize := dsize + UINT64(hsize) shl 32;
+  if resdata then
+  begin
+    hsize := 0;
+    ssize := SetFilePointer(sf, 0, @hsize, FILE_END);
+    ssize := ssize + UINT64(hsize) shl 32;
+  end;
   SetFilePointer(sf, 0, nil, FILE_BEGIN);
   SetFilePointer(df, 0, nil, FILE_BEGIN);
+  if resdata then
+    size := 1
+  else
+    size := 0;
+  WriteFile(pf, size, 4, r, nil);
+  WriteFile(pf, dsize, sizeof(dsize), r, nil);
+  if resdata then
+  begin
+    WriteFile(pf, ssize, sizeof(dsize), r, nil);
+    if ssize > dsize then
+      dsize := ssize;
+  end;
   if (@gpcb = nil) or gpcb(GPO_LENGTH, dsize) then
   begin
     result := true;
-    WriteFile(pf, dsize, sizeof(dsize), size, nil);
     SetLength(Buf1, BUF_SIZE + 2);
     SetLength(Buf2, BUF_SIZE + 2);
     Buf1[BUF_SIZE] := 0;
@@ -108,12 +125,10 @@ begin
     begin
       ZeroMemory(@Buf1[0], BUF_SIZE);
       ZeroMemory(@Buf2[0], BUF_SIZE);
-      ReadFile(sf, Buf1[0], BUF_SIZE, size, nil);
-      if not ReadFile(df, Buf2[0], BUF_SIZE, size, nil) then
-      begin
-        result := false;
-        break;
-      end;
+      ReadFile(sf, Buf1[0], BUF_SIZE, hsize, nil);
+      ReadFile(df, Buf2[0], BUF_SIZE, size, nil);
+      if size < hsize then
+        size := hsize;
       i := 0;
       while i < size do
       begin
@@ -126,13 +141,17 @@ begin
             inp := true;
           end;
           pbuf[poff] := Buf2[i];
+          if resdata then
+            rbuf[poff] := Buf1[i];
           Inc(poff);
-          if poff = $7FFF then
+          if poff > $7FFD then
           begin
             inp := false;
             hsize := off + i + 1 - loff;
             WriteSize(hsize);
             WriteFile(pf, pbuf[0], hsize, r, nil);
+            if resdata then
+              WriteFile(pf, rbuf[0], hsize, r, nil);
             loff := off + i + 1;
             poff := 0;
           end;
@@ -142,16 +161,22 @@ begin
           if (Buf1[i + 1] <> Buf2[i + 1]) or (Buf1[i + 2] <> Buf2[i + 2]) then
           begin
             pbuf[poff] := Buf2[i];
+            if resdata then
+              rbuf[poff] := Buf1[i];
             Inc(poff);
             Inc(i);
             pbuf[poff] := Buf2[i];
+            if resdata then
+              rbuf[poff] := Buf1[i];
             Inc(poff);
-            if poff = $7FFF then
+            if poff > $7FFD then
             begin
               inp := false;
               hsize := off + i + 1 - loff;
               WriteSize(hsize);
               WriteFile(pf, pbuf[0], hsize, r, nil);
+              if resdata then
+                WriteFile(pf, rbuf[0], hsize, r, nil);
               loff := off + i + 1;
               poff := 0;
             end;
@@ -162,6 +187,8 @@ begin
             hsize := off + i - loff;
             WriteSize(hsize);
             WriteFile(pf, pbuf[0], hsize, r, nil);
+            if resdata then
+              WriteFile(pf, rbuf[0], hsize, r, nil);
             loff := off + i;
             poff := 0;
           end;
@@ -180,6 +207,8 @@ begin
       hsize := off - loff;
       WriteSize(hsize);
       WriteFile(pf, pbuf[0], hsize, r, nil);
+      if resdata then
+        WriteFile(pf, rbuf[0], hsize, r, nil);
     end;
     Finalize(Buf1);
     Finalize(Buf2);

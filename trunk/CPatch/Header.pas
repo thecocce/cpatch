@@ -32,7 +32,7 @@ const
   MAIN_HEIGHT = 280;
 
 var
-  MainWnd, SrcFileWnd, SrcFileBtn, DescWnd, GoBtnWnd, ProgWnd: HWND;
+  MainWnd, SrcFileWnd, SrcFileBtn, DescWnd, ResCheck, GoBtnWnd, ProgWnd: HWND;
   pf: THandle;
   patchoff: Cardinal;
   Terminated: Boolean;
@@ -100,7 +100,7 @@ begin
             begin
               GetWindowTextW(SrcFileWnd, orgfn, 260);
               SetFilePointer(pf, patchoff, nil, FILE_BEGIN);
-              if not DoPatch(orgfn, pf, PCallback) then
+              if not DoPatch(orgfn, pf, PCallback, (ResCheck = 0) or (SendMessage(ResCheck, BM_GETCHECK, 0, 0) = BST_CHECKED)) then
               begin
                 if not Terminated then
                   MessageBox(hWnd,
@@ -222,7 +222,7 @@ procedure InitWindows;
 var
   cx, cy: Integer;
   rect: TRect;
-  size, r: Cardinal;
+  flag, size, r: Cardinal;
   wt: array of Byte;
 begin
 	MyRegisterClass(hInstance);
@@ -258,6 +258,41 @@ begin
     UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 8, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 65, MainWnd, 0, hInstance, nil),
     IDC_DESC, hInstance, nil);
 
+  ReadFile(pf, size, 4, r, nil);
+  SetLength(wt, size * 2 + 2);
+  ReadFile(pf, wt[0], size * 2, r, nil);
+  SetWindowTextW(MainWnd, @wt[0]);
+  wt[size * 2] := 0;
+  wt[size * 2 + 1] := 0;
+  ReadFile(pf, size, 4, r, nil);
+  SetLength(wt, size + 1);
+  ReadFile(pf, wt[0], size, r, nil);
+  SetWindowTextW(DescWnd, @wt[0]);
+  Finalize(wt);
+  patchoff := SetFilePointer(pf, 0, nil, FILE_CURRENT);
+  ReadFile(pf, flag, 4, r, nil);
+  if (flag and 1) > 0 then
+  begin
+    ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left + 8,
+      rect.Bottom - 28, rect.Right - rect.Left - 164, 20, MainWnd, IDC_PROGRESS,
+      hInstance, nil);
+
+    ResCheck := UserWin(0, 'BUTTON',
+{$IFDEF LANG_CHS}
+    '还原数据'
+{$ELSE}
+    'Restore'
+{$ENDIF}
+      , WS_VISIBLE or WS_CHILD or BS_AUTOCHECKBOX, rect.Right - 154, rect.Bottom - 28, 64, 20, MainWnd, 0, hInstance, nil);
+  end
+  else
+  begin
+    ResCheck := 0;
+    ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left + 8,
+      rect.Bottom - 28, rect.Right - rect.Left - 98, 20, MainWnd, IDC_PROGRESS,
+      hInstance, nil);
+  end;
+
   GoBtnWnd := UserWin(0, 'BUTTON',
 {$IFDEF LANG_CHS}
   '应用补丁!'
@@ -267,17 +302,7 @@ begin
   , WS_VISIBLE or WS_CHILD or
     BS_PUSHBUTTON, rect.Right - 88, rect.Bottom - 28, 80, 20, MainWnd, IDC_GOBTN,
     hInstance, nil);
-
-  ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left + 8,
-    rect.Bottom - 28, rect.Right - rect.Left - 98, 20, MainWnd, IDC_PROGRESS,
-    hInstance, nil);
-
-  ReadFile(pf, size, 4, r, nil);
-  SetLength(wt, size + 1);
-  ReadFile(pf, wt[0], size, r, nil);
-  patchoff := SetFilePointer(pf, 0, nil, FILE_CURRENT);
-  SetWindowTextW(DescWnd, @wt[0]);
-  Finalize(wt);
+  EnableWindow(GoBtnWnd, false);
 
   ShowWindow(MainWnd, CmdShow);
 	UpdateWindow(MainWnd);
