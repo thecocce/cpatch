@@ -12,16 +12,17 @@ const
   PO_LENGTH = 0;
   PO_OFFSET = 1;
 
-function DoPatch(const sfile: PWideChar; const pf: THandle; pcb: TPCallback):Boolean;
+function DoPatch(const sfile: PWideChar; const pf: THandle; pcb: TPCallback; restore: Boolean = false):Boolean;
 
 implementation
 
-function DoPatch(const sfile: PWideChar; const pf: THandle; pcb: TPCallback):Boolean;
+function DoPatch(const sfile: PWideChar; const pf: THandle; pcb: TPCallback; restore: Boolean):Boolean;
 var
-  hsize, off, size, rr: Cardinal;
-  fsize, foff, nsize: UINT64;
+  flag, hsize, off, size, rr: Cardinal;
+  osize, fsize, foff, nsize: UINT64;
   sf: THandle;
   data: packed array [0..$7FFF] of Byte;
+  resdata: boolean;
 
   function ReadSize: Cardinal;
   var
@@ -36,7 +37,7 @@ var
     end
     else
     begin
-      result := (Cardinal(b) and $3F) shl 8;
+      result := (Cardinal(b) and $7F) shl 8;
       ReadFile(pf, b, 1, r, nil);
       result := result + Cardinal(b);
       Inc(foff, 2);
@@ -88,7 +89,12 @@ begin
   sf := CreateFileW(sfile, GENERIC_READ or GENERIC_WRITE, 0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
   if sf = INVALID_HANDLE_VALUE then
     Exit;
+  ReadFile(pf, flag, 4, rr, nil);
+  resdata := (flag and 1) > 0;
+
   ReadFile(pf, nsize, 8, rr, nil);
+  if resdata then
+    ReadFile(pf, osize, 8, rr, nil);
   hsize := 0;
   foff := SetFilePointer(pf, 0, @hsize, FILE_CURRENT);
   foff := foff + (UINT64(hsize) shl 32);
@@ -105,8 +111,26 @@ begin
     begin
       off := ReadOff;
       size := ReadSize;
-      if (not ReadFile(pf, data[0], size, rr, nil)) or (rr < size) then
-        break;
+      if resdata then
+      begin
+        if restore then
+        begin
+          SetFilePointer(pf, size, nil, FILE_CURRENT);
+          if (not ReadFile(pf, data[0], size, rr, nil)) or (rr < size) then
+            break;
+        end
+        else
+        begin
+          if (not ReadFile(pf, data[0], size, rr, nil)) or (rr < size) then
+            break;
+          SetFilePointer(pf, size, nil, FILE_CURRENT);
+        end;
+      end
+      else
+      begin
+        if (not ReadFile(pf, data[0], size, rr, nil)) or (rr < size) then
+          break;
+      end;
       SetFilePointer(sf, off, nil, FILE_CURRENT);
       WriteFile(sf, data[0], size, rr, nil);
       Inc(foff, size);
@@ -117,8 +141,16 @@ begin
       end;
     end;
   end;
-  hsize := nsize shr 32;
-  SetFilePointer(sf, nsize and $FFFFFFFF, @hsize, FILE_BEGIN);
+  if resdata and restore then
+  begin
+    hsize := osize shr 32;
+    SetFilePointer(sf, osize and $FFFFFFFF, @hsize, FILE_BEGIN);
+  end
+  else
+  begin
+    hsize := nsize shr 32;
+    SetFilePointer(sf, nsize and $FFFFFFFF, @hsize, FILE_BEGIN);
+  end;
   SetEndOfFile(sf);
   CloseHandle(sf);
 end;

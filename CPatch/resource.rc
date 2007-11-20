@@ -48,14 +48,14 @@ BEGIN
     BLOCK "040904B0"
     BEGIN
       VALUE "CompanyName", "\0"
-      VALUE "FileVersion", "0.2.1.5\0"
+      VALUE "FileVersion", "0.3.0.7\0"
       VALUE "FileDescription", "\0"
       VALUE "InternalName", "CPatch\0"
       VALUE "LegalCopyright", "\0"
       VALUE "LegalTrademarks", "\0"
       VALUE "OriginalFilename", "\0"
       VALUE "ProductName", "CPatch\0"
-      VALUE "ProductVersion", "0.2.1.5\0"
+      VALUE "ProductVersion", "0.3.0.7\0"
     END
   END
   BLOCK "VarFileInfo"

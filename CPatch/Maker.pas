@@ -37,7 +37,7 @@ const
   MAIN_HEIGHT = 450;
 
 var
-  MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, IconBtn, DescWnd, GoBtnWnd, ProgWnd: HWND;
+  MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, IconBtn, TitleWnd, DescWnd, ResCheck, GoBtnWnd, ProgWnd: HWND;
   Terminated: Boolean;
   icon: HICON;
   iconf: packed array [0..259] of WideChar;
@@ -141,6 +141,7 @@ var
   desc: TDesc;
   dc: HDC;
   ps: TPaintStruct;
+  title: array of WideChar;
 const
   Magic: ShortString = 'PATCHDAT';
 begin
@@ -148,7 +149,7 @@ begin
   WM_PAINT:
     begin
       dc := BeginPaint(MainWnd, ps);
-      DrawIconEx(dc, 200, 55, icon, 32, 32, 0, 0, DI_NORMAL);
+      DrawIconEx(dc, 200, 77, icon, 32, 32, 0, 0, DI_NORMAL);
       EndPaint(MainWnd, ps);
     end;
 	WM_COMMAND:
@@ -217,10 +218,16 @@ begin
                 es.pfnCallback := sicb;
                 SendMessage(DescWnd, EM_STREAMOUT, SF_RTF or SF_USECODEPAGE or (CP_UTF8 shl 16), Cardinal(@es));
                 WriteFile(pf, Magic[1], 8, w, nil);
+                size := GetWindowTextLengthW(TitleWnd);
+                SetLength(title, size + 1);
+                GetWindowTextW(TitleWnd, @title[0], size + 1);
+                WriteFile(pf, size, 4, w, nil);
+                WriteFile(pf, title[0], size * 2, w, nil);
+                Finalize(title);
                 WriteFile(pf, desc.size, 4, w, nil);
                 WriteFile(pf, desc.desc[0], desc.size, w, nil);
                 Finalize(desc.desc);
-                if not GeneratePatch(pf, orgfn, newfn, GPCallback) then
+                if not GeneratePatch(pf, orgfn, newfn, GPCallback, SendMessage(ResCheck, BM_GETCHECK, 0, 0) = BST_CHECKED) then
                 begin
                   CloseHandle(pf);
                   if Terminated then
@@ -399,6 +406,19 @@ begin
     BS_PUSHBUTTON, rect.Right - rect.Left - 68, rect.Top + 30, 60, 20, MainWnd, IDC_DSTBTN,
     hInstance, nil);
 
+  UserWin(0, 'STATIC',
+{$IFDEF LANG_CHS}
+  '补丁标题:'
+{$ELSE}
+  'Title:'
+{$ENDIF}
+  , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 55, 60, 16, MainWnd, 0, hInstance, nil);
+  TitleWnd := UserWin(WS_EX_CLIENTEDGE, 'EDIT', nil, WS_VISIBLE or WS_CHILD or ES_AUTOHSCROLL,
+    rect.Left + 70, 52, rect.Right - rect.Left - 78, 20, MainWnd, IDC_DSTFILE,
+    hInstance, nil);
+
+  SetWindowTextW(TitleWnd, 'CPatch');
+
   IconBtn := UserWin(0, 'BUTTON',
 {$IFDEF LANG_CHS}
     '选择图标'
@@ -406,7 +426,7 @@ begin
     'Select Icon'
 {$ENDIF}
     , WS_VISIBLE or WS_CHILD or
-    BS_PUSHBUTTON, rect.Left + 70, rect.Top + 52, 100, 20, MainWnd, IDC_ICONBTN,
+    BS_PUSHBUTTON, rect.Left + 70, rect.Top + 74, 100, 20, MainWnd, IDC_ICONBTN,
     hInstance, nil);
 
   UserWin(0, 'STATIC',
@@ -415,19 +435,28 @@ begin
 {$ELSE}
   'Description:'
 {$ENDIF}
-  , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 77, 180, 16, MainWnd, 0, hInstance, nil);
+  , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 99, 180, 16, MainWnd, 0, hInstance, nil);
 
   DescWnd := UserWin(0, RICHEDIT_CLASSNAME, nil, WS_VISIBLE or WS_CHILD or ES_AUTOHSCROLL or ES_AUTOVSCROLL or ES_WANTRETURN or WS_HSCROLL or WS_VSCROLL or ES_MULTILINE,
-    1, 1, rect.Right - rect.Left - 18, rect.Bottom - rect.Top - 129,
-    UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 95, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 127, MainWnd, 0, hInstance, nil),
+    1, 1, rect.Right - rect.Left - 18, rect.Bottom - rect.Top - 151,
+    UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 117, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 149, MainWnd, 0, hInstance, nil),
     IDC_DESC, hInstance, nil);
+
+  ResCheck := UserWin(0, 'BUTTON',
+{$IFDEF LANG_CHS}
+  '包含还原数据'
+{$ELSE}
+  'Restore data'
+{$ENDIF}
+    , WS_VISIBLE or WS_CHILD or BS_AUTOCHECKBOX, rect.Right - 204, rect.Bottom - 28, 110, 20, MainWnd, 0, hInstance, nil);
 
   GoBtnWnd := UserWin(0, 'BUTTON', 'GO!', WS_VISIBLE or WS_CHILD or
     BS_PUSHBUTTON, rect.Right - 88, rect.Bottom - 28, 80, 20, MainWnd, IDC_GOBTN,
     hInstance, nil);
+  EnableWindow(GoBtnWnd, false);
 
   ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left + 8,
-    rect.Bottom - 28, rect.Right - rect.Left - 98, 20, MainWnd, IDC_PROGRESS,
+    rect.Bottom - 28, rect.Right - rect.Left - 218, 20, MainWnd, IDC_PROGRESS,
     hInstance, nil);
   ShowWindow(MainWnd, CmdShow);
 	UpdateWindow(MainWnd);
