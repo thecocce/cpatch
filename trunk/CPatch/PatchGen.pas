@@ -98,8 +98,8 @@ begin
     SetLength(Buf2, BUF_SIZE + 2);
     Buf1[BUF_SIZE] := 0;
     Buf1[BUF_SIZE + 1] := 0;
-    Buf2[BUF_SIZE] := 1;
-    Buf2[BUF_SIZE + 1] := 1;
+    Buf2[BUF_SIZE] := 0;
+    Buf2[BUF_SIZE + 1] := 0;
     off := 0;
     poff := 0;
     loff := 0;
@@ -139,7 +139,7 @@ begin
         end
         else if inp then
         begin
-          if (Buf1[i + 1] = Buf2[i + 1]) or (Buf1[i + 2] = Buf2[i + 2]) then
+          if (Buf1[i + 1] <> Buf2[i + 1]) or (Buf1[i + 2] <> Buf2[i + 2]) then
           begin
             pbuf[poff] := Buf2[i];
             Inc(poff);
