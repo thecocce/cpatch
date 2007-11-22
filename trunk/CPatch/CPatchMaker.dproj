@@ -42,6 +42,18 @@
     </RcCompile>
     <DCCReference Include="ComCtl32.pas" />
     <DCCReference Include="CommDlg.pas" />
+    <DCCReference Include="LZMA\compression\LZMA\ULZMABase.pas" />
+    <DCCReference Include="LZMA\compression\LZMA\ULZMACommon.pas" />
+    <DCCReference Include="LZMA\compression\LZMA\ULZMAEncoder.pas" />
+    <DCCReference Include="LZMA\compression\LZ\ULZBinTree.pas" />
+    <DCCReference Include="LZMA\compression\LZ\ULZInWindow.pas" />
+    <DCCReference Include="LZMA\compression\RangeCoder\UBitTreeEncoder.pas" />
+    <DCCReference Include="LZMA\compression\RangeCoder\URangeDecoder.pas" />
+    <DCCReference Include="LZMA\compression\RangeCoder\URangeEncoder.pas" />
+    <DCCReference Include="LZMA\UBufferedFS.pas" />
+    <DCCReference Include="LZMA\uClass.pas" />
+    <DCCReference Include="LZMA\UCRC.pas" />
+    <DCCReference Include="LZMA\ULZMAEnc.pas" />
     <DCCReference Include="Maker.pas" />
     <DCCReference Include="PatchGen.pas" />
     <DCCReference Include="UpdateIcon.pas" />
