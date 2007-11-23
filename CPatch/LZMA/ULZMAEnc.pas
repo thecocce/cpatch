@@ -23,7 +23,6 @@ end;
 
 function lzma_encode(instream, outstream: TStream): boolean; overload;
 var
-  i:integer;
   encoder:TLZMAEncoder;
   filesize:int64;
 const
@@ -39,8 +38,7 @@ begin
   encoder.SetEndMarkerMode(false);
   encoder.WriteCoderProperties(outStream);
   fileSize := inStream.Size;
-  for i := 0 to 7 do
-    WriteByte(outStream, (fileSize shr (8 * i)) and $FF);
+  outStream.Write(filesize, 4);
   encoder.Code(inStream, outStream, -1, -1);
   result := true;
   encoder.Free;

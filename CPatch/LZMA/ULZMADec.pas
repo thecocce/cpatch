@@ -23,11 +23,9 @@ end;
 
 function lzma_decode(instream, outstream: TStream): boolean; overload;
 var
-  i:integer;
   properties:array[0..4] of byte;
   decoder:TLZMADecoder;
   outSize:int64;
-  v:byte;
 const
   propertiessize = 5;
 
@@ -45,16 +43,8 @@ begin
     decoder.Free;
     Exit;
   end;
-  outSize := 0;
-  for i := 0 to 7 do begin
-    v := (ReadByte(inStream));
-    if v > 1 then
-    begin
-      decoder.Free;
-      Exit;
-    end;
-    outSize := outSize or v shl (8 * i);
-  end;
+  outsize := 0;
+  inStream.Read(outSize, 4);
   if not decoder.Code(inStream, outStream, outSize) then
   begin
     decoder.Free;
