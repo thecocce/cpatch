@@ -7,7 +7,7 @@ unit PatchGen;
 interface
 
 uses
-  Windows;
+  Windows, UBufferedFS;
 
 type
   TGPCallback = function(OP: Integer; Value: UINT64): Boolean;
@@ -16,63 +16,85 @@ const
   GPO_LENGTH = 0;
   GPO_POSITION = 1;
 
-function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback; resdata: Boolean = false):Boolean;
+function GeneratePatch(pst: TBufferedFS; const sfile, dfile: PWideChar; gpcb: TGPCallback; resdata: Boolean = false):Boolean;
 
 implementation
 
+uses ULZMAEnc, uClass;
+
 const
   BUF_SIZE = 2 * 1024 * 1024;
+  BLOCK_SIZE = 4 * 1024 * 1024;
 
-function GeneratePatch(const pf: THandle; const sfile, dfile: PWideChar; gpcb: TGPCallback; resdata: Boolean): Boolean;
+function GeneratePatch(pst: TBufferedFS; const sfile, dfile: PWideChar; gpcb: TGPCallback; resdata: Boolean): Boolean;
 var
   sf, df: THandle;
   Buf1, Buf2: array of Byte;
   pbuf, rbuf: packed array [0..$7FFF] of Byte;
-  size, hsize, i, r, poff: Cardinal;
+  size, hsize, i, poff: Cardinal;
   ssize, dsize, off, loff: UINT64;
   inp: Boolean;
+  fst: TMemoryStream;
 
   procedure WriteSize(const value: Cardinal);
   var
-    w, v: Cardinal;
+    v: Cardinal;
   begin
     if value < $80 then
-      WriteFile(pf, value, 1, w, nil)
+      fst.Write(value, 1)
     else if value < $8000 then
     begin
       v := ((value and $7F00) shr 8) + ((value and $FF) shl 8) + $80;
-      WriteFile(pf, v, 2, w, nil);
+      fst.Write(v, 2);
     end;
   end;
 
   procedure WriteOff(value: UINT64);
   var
-    w, v, p: Cardinal;
+    v: Cardinal;
   begin
-    while value > $FFFFFFFF do
+    while value > $3FFFFFFF do
     begin
-      p := $FFFFFFFF;
-      WriteFile(pf, p, 4, w, nil);
+      WriteOff($3FFFFFFF);
       WriteSize(0);
-      Dec(value, $FFFFFFFF);
+      Dec(value, $3FFFFFFF);
     end;
     if value < $40 then
-      WriteFile(pf, value, 1, w, nil)
+      fst.Write(value, 1)
     else if value < $4000 then
     begin
       v := ((value and $3F00) shr 8) + ((value and $FF) shl 8) + $40;
-      WriteFile(pf, v, 2, w, nil);
+      fst.Write(v, 2);
     end
     else if value < $400000 then
     begin
       v := ((value and $3F0000) shr 16) + (value and $FF00) + ((value and $FF) shl 16) + $80;
-      WriteFile(pf, v, 3, w, nil);
+      fst.Write(v, 3);
     end
     else if value < $40000000 then
     begin
       v := ((value and $3F000000) shr 24) + ((value and $FF0000) shr 8) + ((value and $FF00) shl 8) + ((value and $FF) shl 24) + $C0;
-      WriteFile(pf, v, 4, w, nil);
-    end
+      fst.Write(v, 4);
+    end;
+  end;
+
+  procedure WriteData2(const data; size: cardinal);
+  begin
+    fst.Write(data, size);
+  end;
+
+  procedure WriteBack;
+  begin
+    fst.Position := 0;
+    lzma_encode(fst, pst);
+    fst.Clear;
+  end;
+
+  procedure WriteData(const data; size: cardinal);
+  begin
+    fst.Write(data, size);
+    if fst.Size > BLOCK_SIZE then
+      WriteBack;
   end;
 
 begin
@@ -85,6 +107,7 @@ begin
     CloseHandle(df);
     Exit;
   end;
+  fst := TMemoryStream.Create;
   hsize := 0;
   dsize := SetFilePointer(df, 0, @hsize, FILE_END);
   dsize := dsize + UINT64(hsize) shl 32;
@@ -100,11 +123,11 @@ begin
     size := 1
   else
     size := 0;
-  WriteFile(pf, size, 4, r, nil);
-  WriteFile(pf, dsize, sizeof(dsize), r, nil);
+  pst.Write(size, 4);
+  pst.Write(dsize, sizeof(dsize));
   if resdata then
   begin
-    WriteFile(pf, ssize, sizeof(dsize), r, nil);
+    pst.Write(ssize, sizeof(ssize));
     if ssize > dsize then
       dsize := ssize;
   end;
@@ -123,6 +146,11 @@ begin
     inp := false;
     while off < dsize do
     begin
+      if (@gpcb <> nil) and not gpcb(GPO_POSITION, off) then
+      begin
+        result := false;
+        break;
+      end;
       ZeroMemory(@Buf1[0], BUF_SIZE);
       ZeroMemory(@Buf2[0], BUF_SIZE);
       ReadFile(sf, Buf1[0], BUF_SIZE, hsize, nil);
@@ -149,9 +177,13 @@ begin
             inp := false;
             hsize := off + i + 1 - loff;
             WriteSize(hsize);
-            WriteFile(pf, pbuf[0], hsize, r, nil);
             if resdata then
-              WriteFile(pf, rbuf[0], hsize, r, nil);
+            begin
+              WriteData2(pbuf[0], hsize);
+              WriteData(rbuf[0], hsize);
+            end
+            else
+              WriteData(pbuf[0], hsize);
             loff := off + i + 1;
             poff := 0;
           end;
@@ -174,9 +206,13 @@ begin
               inp := false;
               hsize := off + i + 1 - loff;
               WriteSize(hsize);
-              WriteFile(pf, pbuf[0], hsize, r, nil);
               if resdata then
-                WriteFile(pf, rbuf[0], hsize, r, nil);
+              begin
+                WriteData2(pbuf[0], hsize);
+                WriteData(rbuf[0], hsize);
+              end
+              else
+                WriteData(pbuf[0], hsize);
               loff := off + i + 1;
               poff := 0;
             end;
@@ -186,9 +222,13 @@ begin
             inp := false;
             hsize := off + i - loff;
             WriteSize(hsize);
-            WriteFile(pf, pbuf[0], hsize, r, nil);
             if resdata then
-              WriteFile(pf, rbuf[0], hsize, r, nil);
+            begin
+              WriteData2(pbuf[0], hsize);
+              WriteData(rbuf[0], hsize);
+            end
+            else
+              WriteData(pbuf[0], hsize);
             loff := off + i;
             poff := 0;
           end;
@@ -196,58 +236,25 @@ begin
         Inc(i);
       end;
       Inc(off, size);
-      if (@gpcb <> nil) and not gpcb(GPO_POSITION, off) then
-      begin
-        result := false;
-        break;
-      end;
     end;
     if inp then
     begin
       hsize := off - loff;
       WriteSize(hsize);
-      WriteFile(pf, pbuf[0], hsize, r, nil);
+      WriteData2(pbuf[0], hsize);
       if resdata then
-        WriteFile(pf, rbuf[0], hsize, r, nil);
+        WriteData2(rbuf[0], hsize);
+      WriteBack;
     end;
     Finalize(Buf1);
     Finalize(Buf2);
+    if (@gpcb <> nil) and not gpcb(GPO_POSITION, off) then
+      result := false;
   end;
+  fst.Free;
   CloseHandle(sf);
   CloseHandle(df);
 end;
-
-{function CompressBlock(data: array of Byte; var size: Cardinal): Boolean;
-var
-  dest: array [0..$FFFF] of Byte;
-  soff, doff: Cardinal;
-  match: boolean;
-begin
-  result := false;
-  if size < 8 then
-    exit;
-  soff := 0;
-  doff := 0;
-  while soff < size do
-  begin
-    match := false;
-    if soff >= 8 then
-    begin
-
-    end;
-    if not match then
-    begin
-      dest[doff] := data[soff];;
-      Inc(doff);
-      if dest[doff] = $CA then
-      begin
-        dest[doff] := $0;
-        Inc(doff);
-      end;
-      Inc(soff);
-    end;
-  end;
-end;}
 
 end.
 

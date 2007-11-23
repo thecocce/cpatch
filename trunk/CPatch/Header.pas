@@ -19,7 +19,8 @@ uses
   ShellAPI,
   CommDlg,
   ComCtl32,
-  Patcher;
+  Patcher,
+  uClass;
 
 const
   IDC_SRCFILE = 101;
@@ -33,7 +34,7 @@ const
 
 var
   MainWnd, SrcFileWnd, SrcFileBtn, DescWnd, ResCheck, GoBtnWnd, ProgWnd: HWND;
-  pf: THandle;
+  pst: TFileStream;
   patchoff: Cardinal;
   Terminated: Boolean;
 
@@ -99,8 +100,8 @@ begin
           IDC_GOBTN:
             begin
               GetWindowTextW(SrcFileWnd, orgfn, 260);
-              SetFilePointer(pf, patchoff, nil, FILE_BEGIN);
-              if not DoPatch(orgfn, pf, PCallback, (ResCheck = 0) or (SendMessage(ResCheck, BM_GETCHECK, 0, 0) = BST_CHECKED)) then
+              pst.Position := patchoff;
+              if not DoPatch(orgfn, pst, PCallback, (ResCheck = 0) or (SendMessage(ResCheck, BM_GETCHECK, 0, 0) = BST_CHECKED)) then
               begin
                 if not Terminated then
                   MessageBox(hWnd,
@@ -156,7 +157,9 @@ begin
         DragQueryPoint(wParam, point);
         SetWindowTextW(SrcFileWnd, szFile);
         DragFinish(wParam);
-      end;
+        if GetWindowTextLengthW(SrcFileWnd) > 0 then
+          EnableWindow(GoBtnWnd, TRUE);
+     end;
     end;
 	WM_DESTROY:
   	PostQuitMessage(0);
@@ -222,7 +225,7 @@ procedure InitWindows;
 var
   cx, cy: Integer;
   rect: TRect;
-  flag, size, r: Cardinal;
+  flag, size: Cardinal;
   wt: array of Byte;
 begin
 	MyRegisterClass(hInstance);
@@ -258,19 +261,19 @@ begin
     UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 8, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 65, MainWnd, 0, hInstance, nil),
     IDC_DESC, hInstance, nil);
 
-  ReadFile(pf, size, 4, r, nil);
+  pst.Read(size, 4);
   SetLength(wt, size * 2 + 2);
-  ReadFile(pf, wt[0], size * 2, r, nil);
+  pst.Read(wt[0], size * 2);
   SetWindowTextW(MainWnd, @wt[0]);
   wt[size * 2] := 0;
   wt[size * 2 + 1] := 0;
-  ReadFile(pf, size, 4, r, nil);
+  pst.Read(size, 4);
   SetLength(wt, size + 1);
-  ReadFile(pf, wt[0], size, r, nil);
+  pst.Read(wt[0], size);
   SetWindowTextW(DescWnd, @wt[0]);
   Finalize(wt);
-  patchoff := SetFilePointer(pf, 0, nil, FILE_CURRENT);
-  ReadFile(pf, flag, 4, r, nil);
+  patchoff := pst.Position;
+  pst.Read(flag, 4);
   if (flag and 1) > 0 then
   begin
     ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left + 8,
@@ -326,27 +329,24 @@ end;
 
 function InitPatch: Boolean;
 var
-  off, r: Cardinal;
+  off: Cardinal;
   mdata: packed array [0..7] of Char;
 const
   magic: ShortString = 'PATCHDAT';
 begin
   result := false;
-  pf := CreateFileA(PChar(ParamStr(0)), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-  if pf = INVALID_HANDLE_VALUE then
-    exit;
+  pst := TFileStream.Create(ParamStr(0), fmOpenRead or fmShareDenyNone);
   off := 0;
   mdata[0] := #0;
   repeat
     Inc(off, 512);
-    SetFilePointer(pf, off, nil, FILE_BEGIN);
-    ReadFile(pf, mdata[0], 8, r, nil);
-    if r < 8 then
+    pst.Position := off;
+    if pst.Read(mdata[0], 8) < 8 then
       break;
   until (magic = mdata);
   if magic <> mdata then
   begin
-    CloseHandle(pf);
+    pst.Free;
     exit;
   end;
   result := true;
@@ -361,7 +361,7 @@ begin
   InitWindows;
   MessageLoop;
   DeleteObject(g_font);
-  CloseHandle(pf);
+  pst.Free;
 end;
 
 end.

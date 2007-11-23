@@ -21,7 +21,9 @@ uses
   CommDlg,
   ComCtl32,
   UpdateIcon,
-  PatchGen;
+  PatchGen,
+  uClass,
+  UBufferedFS;
 
 const
   IDC_SRCFILE = 101;
@@ -34,10 +36,10 @@ const
   IDC_PROGRESS = 108;
 
   MAIN_WIDTH = 500;
-  MAIN_HEIGHT = 450;
+  MAIN_HEIGHT = 475;
 
 var
-  MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, IconBtn, TitleWnd, DescWnd, ResCheck, GoBtnWnd, ProgWnd: HWND;
+  MainWnd, SrcFileWnd, SrcFileBtn, DstFileWnd, DstFileBtn, IconBtn, TitleWnd, DescWnd, ResCheck, UpxCheck, GoBtnWnd, ProgWnd: HWND;
   Terminated: Boolean;
   icon: HICON;
   iconf: packed array [0..259] of WideChar;
@@ -127,14 +129,36 @@ begin
   end;
 end;
 
+var
+  upxFile: String;
+
+procedure RunUpx(const filename: PWideChar);
+var
+  si: TSTARTUPINFOW;
+  pi: TPROCESSINFORMATION;
+  cmdline: WideString;
+begin
+  ZeroMemory(@si, sizeof(si));
+  ZeroMemory(@pi, sizeof(pi));
+  si.cb := sizeof(si);
+  si.wShowWindow := SW_HIDE;
+  si.dwFlags := STARTF_FORCEOFFFEEDBACK or STARTF_USESHOWWINDOW;
+  cmdline := upxFile;
+  cmdline := cmdline + ' -9 -q "' + filename + '"';
+  if CreateProcessW(nil, PWideChar(cmdline), nil, nil, false, 0, nil, nil, si, pi) then
+  begin
+    WaitForSingleObject(pi.hProcess, INFINITE);
+  end;
+end;
+
 function WndProc(hWnd: HWND; message: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 var
   ofn: OPENFILENAMEW;
   szFile: packed array [0..259] of WCHAR;
   point: TPoint;
-  FWnd, size, w: Cardinal;
+  FWnd, size: Cardinal;
   orgfn, newfn: array [0..259] of WideChar;
-  pf: THandle;
+  pst: TBufferedFS;
   hrsrc: Cardinal;
   hres: HGLOBAL;
   es: TEditStream;
@@ -198,38 +222,38 @@ begin
               begin
                 GetWindowTextW(SrcFileWnd, orgfn, 260);
                 GetWindowTextW(DstFileWnd, newfn, 260);
-                pf := CreateFileW(ofn.lpstrFile, GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+                pst := TBufferedFS.Create(WideString(ofn.lpstrFile), fmcreate);
                 hrsrc := FindResourceW(0, PWideChar(150), 'DATA');
                 hres := LoadResource(0, hrsrc);
                 size := SizeofResource(0, hrsrc);
-                WriteFile(pf, LockResource(hres)^, size, w, nil);
+                pst.Write(LockResource(hres)^, size);
                 UnlockResource(hres);
                 FreeResource(hrsrc);
-                CloseHandle(pf);
+                pst.Free;
 
                 UpdateIconFromFile(@iconf[0], ofn.lpstrFile);
 
-                pf := CreateFileW(ofn.lpstrFile, GENERIC_WRITE or GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-                SetFilePointer(pf, 0, nil, FILE_END);
+                pst := TBufferedFS.Create(WideString(ofn.lpstrFile), fmOpenReadWrite);
+                pst.Seek(0, soEnd);
                 SetLength(desc.desc, 256);
                 desc.size := 0;
                 es.dwError := 0;
                 es.dwCookie := Integer(@desc);
                 es.pfnCallback := sicb;
                 SendMessage(DescWnd, EM_STREAMOUT, SF_RTF or SF_USECODEPAGE or (CP_UTF8 shl 16), Cardinal(@es));
-                WriteFile(pf, Magic[1], 8, w, nil);
+                pst.Write(Magic[1], 8);
                 size := GetWindowTextLengthW(TitleWnd);
                 SetLength(title, size + 1);
                 GetWindowTextW(TitleWnd, @title[0], size + 1);
-                WriteFile(pf, size, 4, w, nil);
-                WriteFile(pf, title[0], size * 2, w, nil);
+                pst.Write(size, 4);
+                pst.Write(title[0], size * 2);
                 Finalize(title);
-                WriteFile(pf, desc.size, 4, w, nil);
-                WriteFile(pf, desc.desc[0], desc.size, w, nil);
+                pst.Write(desc.size, 4);
+                pst.Write(desc.desc[0], desc.size);
                 Finalize(desc.desc);
-                if not GeneratePatch(pf, orgfn, newfn, GPCallback, SendMessage(ResCheck, BM_GETCHECK, 0, 0) = BST_CHECKED) then
+                if not GeneratePatch(pst, orgfn, newfn, GPCallback, SendMessage(ResCheck, BM_GETCHECK, 0, 0) = BST_CHECKED) then
                 begin
-                  CloseHandle(pf);
+                  pst.Free;
                   if Terminated then
                     Halt;
                   MessageBox(hWnd,
@@ -242,7 +266,8 @@ begin
                 end
                 else
                 begin
-                  CloseHandle(pf);
+                  pst.Free;
+                  RunUpx(ofn.lpstrFile);
                   MessageBox(hWnd,
 {$IFDEF LANG_CHS}
                     '补丁生成成功!', '成功'
@@ -301,6 +326,8 @@ begin
             SetWindowTextW(DstFileWnd, szFile);
         end;
         DragFinish(wParam);
+        if (GetWindowTextLengthW(SrcFileWnd) > 0) and (GetWindowTextLengthW(DstFileWnd) > 0) then
+          EnableWindow(GoBtnWnd, TRUE);
       end;
     end;
 	WM_DESTROY:
@@ -438,17 +465,28 @@ begin
   , WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 99, 180, 16, MainWnd, 0, hInstance, nil);
 
   DescWnd := UserWin(0, RICHEDIT_CLASSNAME, nil, WS_VISIBLE or WS_CHILD or ES_AUTOHSCROLL or ES_AUTOVSCROLL or ES_WANTRETURN or WS_HSCROLL or WS_VSCROLL or ES_MULTILINE,
-    1, 1, rect.Right - rect.Left - 18, rect.Bottom - rect.Top - 151,
-    UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 117, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 149, MainWnd, 0, hInstance, nil),
+    1, 1, rect.Right - rect.Left - 18, rect.Bottom - rect.Top - 171,
+    UserWin(0, 'STATIC', nil, WS_BORDER or WS_VISIBLE or WS_CHILD, rect.Left + 8, rect.Top + 117, rect.Right - rect.Left - 16, rect.Bottom - rect.Top - 169, MainWnd, 0, hInstance, nil),
     IDC_DESC, hInstance, nil);
 
   ResCheck := UserWin(0, 'BUTTON',
 {$IFDEF LANG_CHS}
   '包含还原数据'
 {$ELSE}
-  'Restore data'
+  'Include restore data'
 {$ENDIF}
-    , WS_VISIBLE or WS_CHILD or BS_AUTOCHECKBOX, rect.Right - 204, rect.Bottom - 28, 110, 20, MainWnd, 0, hInstance, nil);
+    , WS_VISIBLE or WS_CHILD or BS_AUTOCHECKBOX, rect.Left + 8, rect.Bottom - 48, 200, 20, MainWnd, 0, hInstance, nil);
+
+  UpxCheck := UserWin(0, 'BUTTON',
+{$IFDEF LANG_CHS}
+  '用 upx 压缩输出文件'
+{$ELSE}
+  'Compress output by upx'
+{$ENDIF}
+    , WS_VISIBLE or WS_CHILD or BS_AUTOCHECKBOX, rect.Left + 216, rect.Bottom - 48, 220, 20, MainWnd, 0, hInstance, nil);
+
+  EnableWindow(UpxCheck, FileExists(upxFile));
+  SendMessage(UpxCheck, BM_SETCHECK, Cardinal(FileExists(upxFile)), 0);
 
   GoBtnWnd := UserWin(0, 'BUTTON', 'GO!', WS_VISIBLE or WS_CHILD or
     BS_PUSHBUTTON, rect.Right - 88, rect.Bottom - 28, 80, 20, MainWnd, IDC_GOBTN,
@@ -456,7 +494,7 @@ begin
   EnableWindow(GoBtnWnd, false);
 
   ProgWnd := UserWin(0, PROGRESS_CLASS, nil, WS_VISIBLE or WS_CHILD, rect.Left + 8,
-    rect.Bottom - 28, rect.Right - rect.Left - 218, 20, MainWnd, IDC_PROGRESS,
+    rect.Bottom - 28, rect.Right - rect.Left - 98, 20, MainWnd, IDC_PROGRESS,
     hInstance, nil);
   ShowWindow(MainWnd, CmdShow);
 	UpdateWindow(MainWnd);
@@ -479,7 +517,19 @@ begin
 end;
 
 procedure Maker_Main;
+var
+  i, l: integer;
 begin
+  upxFile := ParamStr(0);
+  l := Length(upxFile);
+  i := l;
+  while (i > 0) and (upxFile[i] <> '\') do
+    Dec(i);
+  if (i > 0) then
+    Delete(upxFile, i + 1, MaxInt)
+  else
+    upxFile := '';
+  upxFile := upxFile + 'upx.exe';
   InitCommonControlsEx($FFFF);
   g_font := GetAFont;
   InitWindows;
