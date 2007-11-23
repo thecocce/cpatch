@@ -85,9 +85,12 @@ var
 
   procedure WriteBack;
   begin
-    fst.Position := 0;
-    lzma_encode(fst, pst);
-    fst.Clear;
+    if fst.Size > 0 then
+    begin
+      fst.Position := 0;
+      lzma_encode(fst, pst);
+      fst.Clear;
+    end;
   end;
 
   procedure WriteData(const data; size: cardinal);
@@ -244,8 +247,8 @@ begin
       WriteData2(pbuf[0], hsize);
       if resdata then
         WriteData2(rbuf[0], hsize);
-      WriteBack;
     end;
+    WriteBack;
     Finalize(Buf1);
     Finalize(Buf2);
     if (@gpcb <> nil) and not gpcb(GPO_POSITION, off) then
