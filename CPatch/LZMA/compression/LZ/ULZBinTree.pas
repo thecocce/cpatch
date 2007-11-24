@@ -6,7 +6,7 @@ unit ULZBinTree;
 
 interface
 
-uses ULZInWindow,Math;
+uses ULZInWindow, uClass;
 
 type TLZBinTree=class(TLZInWindow)
        public
