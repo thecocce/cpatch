@@ -38,8 +38,8 @@ BEGIN
 END
 
 1 VERSIONINFO
-FILEVERSION 0,4,0,12
-PRODUCTVERSION 0,4,0,12
+FILEVERSION 0,4,1,13
+PRODUCTVERSION 0,4,1,13
 FILEOS VOS_UNKNOWN
 FILETYPE VFT_UNKNOWN
 BEGIN
@@ -48,14 +48,14 @@ BEGIN
     BLOCK "040904B0"
     BEGIN
       VALUE "CompanyName", "\0"
-      VALUE "FileVersion", "0.4.0.12\0"
+      VALUE "FileVersion", "0.4.1.13\0"
       VALUE "FileDescription", "\0"
       VALUE "InternalName", "CPatch\0"
       VALUE "LegalCopyright", "\0"
       VALUE "LegalTrademarks", "\0"
       VALUE "OriginalFilename", "\0"
       VALUE "ProductName", "CPatch\0"
-      VALUE "ProductVersion", "0.4.0.12\0"
+      VALUE "ProductVersion", "0.4.1.13\0"
     END
   END
   BLOCK "VarFileInfo"
