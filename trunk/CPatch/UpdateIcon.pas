@@ -70,7 +70,7 @@ begin
   GetMem(stGID, size);
   Move(LockResource(hres)^, stGID^, size);
   hUpdate := BeginUpdateResourceW(er.exef, false);
-  UpdateResourceW(hUpdate, lpszType, lpszName, 0, stGID, size);
+  UpdateResourceW(hUpdate, lpszType, MAKEINTRESOURCEW(1), 0, stGID, size);
   UnlockResource(hres);
   FreeResource(hrsrc);
   for i := 0 to stGID.idCount - 1 do
