@@ -183,12 +183,12 @@ begin
 	wcex.cbClsExtra		:= 0;
 	wcex.cbWndExtra		:= 0;
 	wcex.hInstance		:= hInstance;
-	wcex.hIcon			:= LoadIcon(hInstance, 'MAINICON');
+	wcex.hIcon			:= LoadIconW(hInstance, MAKEINTRESOURCEW(1));
 	wcex.hCursor		:= LoadCursor(0, IDC_ARROW);
 	wcex.hbrBackground	:= HBRUSH(COLOR_BTNSHADOW);
 	wcex.lpszMenuName	:= nil;
 	wcex.lpszClassName	:= 'CPatchMaker';
-	wcex.hIconSm		:= LoadIcon(wcex.hInstance, 'MAINICONSMALL');
+	wcex.hIconSm		:= 0;
 
 	result := RegisterClassExW(wcex);
 end;
